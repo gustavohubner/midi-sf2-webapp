@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { WorkletSynthesizer } from 'spessasynth_lib';
+import { HarmonyEngine } from '../core/harmony-engine';
+import { ALL_CHORD_QUALITIES } from '../core/chord-detection';
 import VirtualKeyboard from '../components/VirtualKeyboard';
 import InstrumentSection from '../components/InstrumentSection';
 import { Maximize, Minimize, ChevronDown, ChevronRight, Settings, X } from 'lucide-react';
@@ -92,6 +94,26 @@ function SF2WorkstationV2() {
   const [pianoPolyphony, setPianoPolyphony] = useState(16);
   const [synthPolyphony, setSynthPolyphony] = useState(16);
   const [bassPolyphony, setBassPolyphony] = useState(2);
+
+  // Smart Pad State
+  const harmonyEngineRef = useRef(new HarmonyEngine());
+  const activeSmartPadNotesRef = useRef(new Set());
+  const [smartPadEnabled, setSmartPadEnabled] = useState(false);
+  const [currentChord, setCurrentChord] = useState("--");
+  
+  // Smart Pad Settings
+  const [smartPadLatch, setSmartPadLatch] = useState(false);
+  const [smartPadHistorySize, setSmartPadHistorySize] = useState(12);
+  const [allowedChordQualities, setAllowedChordQualities] = useState(ALL_CHORD_QUALITIES);
+
+  // Update Harmony Engine Config
+  useEffect(() => {
+      harmonyEngineRef.current.updateConfig({
+          historySize: smartPadHistorySize,
+          sustainTime: smartPadLatch ? 999999999 : 10000, // Infinite sustain for latch
+          allowedQualities: allowedChordQualities.length === ALL_CHORD_QUALITIES.length ? null : allowedChordQualities
+      });
+  }, [smartPadHistorySize, smartPadLatch, allowedChordQualities]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -452,27 +474,71 @@ function SF2WorkstationV2() {
       }
   }, [bassVolume, bassEnabled]);
 
+  // Smart Pad Helper
+  const updateSynthChord = (harmonicState, velocity) => {
+      if (!synthSynth || !synthEnabled) return;
+
+      const newNotes = new Set(harmonicState.notes);
+      const oldNotes = activeSmartPadNotesRef.current;
+      const playVelocity = synthNoSens ? noSensVelocity : (velocity > 0 ? velocity : 100);
+
+      // Turn off notes not in new chord
+      // We need to iterate over a copy of oldNotes because we are deleting from it
+      Array.from(oldNotes).forEach(n => {
+          if (!newNotes.has(n)) {
+              const finalNote = n + (synthOctave * 12);
+              if (finalNote >= 0 && finalNote <= 127) {
+                  synthSynth.noteOff(0, finalNote);
+              }
+              oldNotes.delete(n);
+          }
+      });
+
+      // Turn on new notes
+      newNotes.forEach(n => {
+          if (!oldNotes.has(n)) {
+              const finalNote = n + (synthOctave * 12);
+              if (finalNote >= 0 && finalNote <= 127) {
+                  synthSynth.noteOn(0, finalNote, playVelocity);
+              }
+              oldNotes.add(n);
+          }
+      });
+  };
+
   // Handle Note Input
   const handleNoteOn = (note, velocity = 100) => {
+    let isBassNote = false;
+
     // Check Split
     if (bassEnabled && note < bassSplitKey) {
+        isBassNote = true;
         if (bassSynth) {
             const vel = bassNoSens ? noSensVelocity : velocity;
             const n = note + (bassOctave * 12);
             if (n >= 0 && n <= 127) bassSynth.noteOn(0, n, vel);
         }
-        return; // Don't play other layers
+        // Removed return to allow Smart Pad to see the note
     }
 
-    if (pianoSynth && pianoEnabled) {
+    if (!isBassNote && pianoSynth && pianoEnabled) {
         const vel = pianoNoSens ? noSensVelocity : velocity;
         const n = note + (pianoOctave * 12);
         if (n >= 0 && n <= 127) pianoSynth.noteOn(0, n, vel);
     }
-    if (synthSynth && synthEnabled) {
-        const vel = synthNoSens ? noSensVelocity : velocity;
-        const n = note + (synthOctave * 12);
-        if (n >= 0 && n <= 127) synthSynth.noteOn(0, n, vel);
+    
+    // Smart Pad Logic
+    if (smartPadEnabled) {
+        harmonyEngineRef.current.noteOn(note, velocity);
+        const harmonicState = harmonyEngineRef.current.getHarmonicState();
+        setCurrentChord(harmonicState.chord || "--");
+        updateSynthChord(harmonicState, velocity);
+    } else {
+        if (!isBassNote && synthSynth && synthEnabled) {
+            const vel = synthNoSens ? noSensVelocity : velocity;
+            const n = note + (synthOctave * 12);
+            if (n >= 0 && n <= 127) synthSynth.noteOn(0, n, vel);
+        }
     }
   };
 
@@ -486,9 +552,17 @@ function SF2WorkstationV2() {
         const n = note + (pianoOctave * 12);
         if (n >= 0 && n <= 127) pianoSynth.noteOff(0, n);
     }
-    if (synthSynth) {
-        const n = note + (synthOctave * 12);
-        if (n >= 0 && n <= 127) synthSynth.noteOff(0, n);
+    
+    if (smartPadEnabled) {
+        harmonyEngineRef.current.noteOff(note);
+        const harmonicState = harmonyEngineRef.current.getHarmonicState();
+        setCurrentChord(harmonicState.chord || "--");
+        updateSynthChord(harmonicState, 0);
+    } else {
+        if (synthSynth) {
+            const n = note + (synthOctave * 12);
+            if (n >= 0 && n <= 127) synthSynth.noteOff(0, n);
+        }
     }
   };
 
@@ -572,6 +646,20 @@ function SF2WorkstationV2() {
       if (bassSynth) bassSynth.setMasterParameter("voiceCap", bassPolyphony);
   }, [bassPolyphony, bassSynth]);
 
+  // Handle Smart Pad Toggle Cleanup
+  useEffect(() => {
+      if (!smartPadEnabled && synthSynth) {
+          activeSmartPadNotesRef.current.forEach(n => {
+              const finalNote = n + (synthOctave * 12);
+              if (finalNote >= 0 && finalNote <= 127) {
+                  synthSynth.noteOff(0, finalNote);
+              }
+          });
+          activeSmartPadNotesRef.current.clear();
+          harmonyEngineRef.current.reset();
+      }
+  }, [smartPadEnabled, synthSynth, synthOctave]);
+
     // Helper for "Sticky 50" slider
     const fromSliderValue = (val) => {
         val = parseInt(val);
@@ -587,7 +675,7 @@ function SF2WorkstationV2() {
     };
 
   return (
-    <div className="min-h-screen bg-gray-900 p-4 md:p-8 font-sans">
+    <div className="min-h-screen bg-gray-900 p-2 md:p-4 font-sans">
       {!audioStarted ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
               <button 
@@ -600,7 +688,7 @@ function SF2WorkstationV2() {
       ) : null}
 
       <div className="max-w-6xl mx-auto">
-        <header className="mb-8 relative flex items-center justify-center">
+        <header className="mb-4 relative flex items-center justify-center">
             <div className="text-center">
                 <h1 className="text-3xl font-bold text-white tracking-tight"><span className='text-red-500'>SF2</span> Workstation</h1>
                 <p className="text-gray-500 text-sm">Tri-Layer Split Player</p>
@@ -632,7 +720,7 @@ function SF2WorkstationV2() {
 
         {showSettings && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
+                <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
                     <button 
                         onClick={() => setShowSettings(false)}
                         className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
@@ -647,7 +735,7 @@ function SF2WorkstationV2() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div>
                             <h3 className="text-lg font-semibold text-gray-300 mb-3">Long Release Time</h3>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
                                 <input 
                                     type="range" 
                                     min="64" 
@@ -661,7 +749,7 @@ function SF2WorkstationV2() {
                             <p className="text-xs text-gray-500 mt-2">Controls the CC 72 value sent when Long Release is enabled (Default: 110).</p>
                         
                             <h3 className="text-lg font-semibold text-gray-300 mb-3 mt-6">No Sens Velocity</h3>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
                                 <input 
                                     type="range" 
                                     min="1" 
@@ -725,16 +813,74 @@ function SF2WorkstationV2() {
                                 </div>
                             </div>
                         </div>
+
+                    <div className="mt-8 border-t border-gray-700 pt-6">
+                        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                            Smart Pad Settings
+                        </h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div>
+                                <div className="flex items-center justify-between mb-4">
+                                    <label className="text-gray-300 font-semibold">Latch Mode</label>
+                                    <button 
+                                        onClick={() => setSmartPadLatch(!smartPadLatch)}
+                                        className={`px-4 py-2 rounded font-bold text-sm transition-colors ${smartPadLatch ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-400'}`}
+                                    >
+                                        {smartPadLatch ? 'ENABLED' : 'DISABLED'}
+                                    </button>
+                                </div>
+                                <p className="text-xs text-gray-500 mb-6">Keeps the chord playing indefinitely until a new chord is detected.</p>
+
+                                <h3 className="text-lg font-semibold text-gray-300 mb-3">History Size</h3>
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="range" 
+                                        min="3" 
+                                        max="24" 
+                                        value={smartPadHistorySize} 
+                                        onChange={(e) => setSmartPadHistorySize(parseInt(e.target.value))}
+                                        className="fader-slider flex-1"
+                                    />
+                                    <span className="text-white font-mono w-12 text-right">{smartPadHistorySize}</span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2">Number of past notes to consider for chord detection.</p>
+                            </div>
+
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-300 mb-3">Allowed Chord Types</h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                                    {ALL_CHORD_QUALITIES.map(quality => (
+                                        <label key={quality} className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer hover:text-white">
+                                            <input 
+                                                type="checkbox"
+                                                checked={allowedChordQualities.includes(quality)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setAllowedChordQualities([...allowedChordQualities, quality]);
+                                                    } else {
+                                                        setAllowedChordQualities(allowedChordQualities.filter(q => q !== quality));
+                                                    }
+                                                }}
+                                                className="rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                                            />
+                                            {quality === "" ? "Major" : quality}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     </div>
                 </div>
             </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
             {/* Left Column: Piano & Synth */}
             <div className="lg:col-span-2 flex flex-col">
                 
-                <div className="bg-gray-800 p-4 rounded-lg mb-4 border border-gray-700 flex items-center gap-4">
+                <div className="bg-gray-800 p-3 rounded-lg mb-2 border border-gray-700 flex items-center gap-">
                     <span className="text-sm font-bold text-gray-400 w-16">MASTER</span>
                     <input 
                         type="range" 
@@ -756,6 +902,8 @@ function SF2WorkstationV2() {
                     enabled={pianoEnabled}
                     setEnabled={setPianoEnabled}
                     eq={eqValues.piano}
+                    smartPadEnabled={smartPadEnabled}
+                    setSmartPadEnabled={setSmartPadEnabled}
                     effects={effectsValues.piano}
                     onUpdateEffects={updateEffects}
                     onLoadFile={handleLoadFile}
@@ -769,7 +917,7 @@ function SF2WorkstationV2() {
                     setOctave={setPianoOctave}
                 />
 
-                <div className="bg-gray-800 p-4 rounded-lg mb-4 border border-gray-700 flex items-center gap-4">
+                <div className="bg-gray-800 p-3 rounded-lg mb-2 border border-gray-700 flex items-center gap-2">
                     <span className="text-sm font-bold text-gray-400">PIANO</span>
                     <input 
                         type="range" 
@@ -784,6 +932,7 @@ function SF2WorkstationV2() {
 
 
                 <InstrumentSection 
+                    currentChord={currentChord}
                     title="Layer 2: Synth" 
                     type="synth"
                     name={synthName}
@@ -803,13 +952,15 @@ function SF2WorkstationV2() {
                     setNoSens={setSynthNoSens}
                     octave={synthOctave}
                     setOctave={setSynthOctave}
+                    smartPadEnabled={smartPadEnabled}
+                    setSmartPadEnabled={setSmartPadEnabled}
                 />
             </div>
 
             {/* Right Column: Bass Split */}
             <div className="lg:col-span-1 flex flex-col h-full">
-                <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col" style={{ marginBottom: '1rem', height: isSplitBassCollapsed ? 'auto' : 'min-content' }}>
-                    <div className="flex justify-between items-center mb-4 cursor-pointer" onClick={() => setIsSplitBassCollapsed(!isSplitBassCollapsed)}>
+                <div className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex flex-col" style={{ marginBottom: '0.5rem', height: isSplitBassCollapsed ? 'auto' : 'min-content' }}>
+                    <div className="flex justify-between items-center mb-2 cursor-pointer" onClick={() => setIsSplitBassCollapsed(!isSplitBassCollapsed)}>
                         <div className="flex items-center gap-2">
                             {isSplitBassCollapsed ? <ChevronRight size={20} className="text-gray-400" /> : <ChevronDown size={20} className="text-gray-400" />}
                             <h2 className="text-xl font-bold text-white">Split Bass</h2>
@@ -818,7 +969,7 @@ function SF2WorkstationV2() {
                     
                     {!isSplitBassCollapsed && (
                     <>
-                    <div className="mb-4">
+                    <div className="mb-2">
                         <label className="block text-xs text-gray-400 mb-1">Split Point (MIDI Note)</label>
                         <div className="flex items-center gap-2">
                             <input 
@@ -831,7 +982,7 @@ function SF2WorkstationV2() {
                         </div>
                     </div>
 
-                    <div className="mb-4">
+                    <div className="mb-2">
                         <label className="block text-xs text-gray-400 mb-1">Volume</label>
                         <input 
                             type="range" 

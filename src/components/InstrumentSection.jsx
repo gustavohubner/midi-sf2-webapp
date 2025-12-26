@@ -22,7 +22,10 @@ const InstrumentSection = ({
     octave,
     setOctave,
     showEffects = true,
-    isCompact = false
+    isCompact = false,
+    smartPadEnabled,
+    setSmartPadEnabled,
+    currentChord
 }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -54,11 +57,16 @@ const InstrumentSection = ({
     };
 
     return (
-    <div className={`bg-gray-800 p-4 rounded-lg mb-4 border border-gray-700`} style={isCompact ? { height: 'inherit' } : {}}>
-      <div className="flex justify-between items-center mb-4 cursor-pointer" onClick={() => setIsCollapsed(!isCollapsed)}>
+    <div className={`bg-gray-800 p-3 rounded-lg mb-2 border border-gray-700`}>
+      <div className="flex justify-between items-center mb-2 cursor-pointer" onClick={() => setIsCollapsed(!isCollapsed)}>
         <div className="flex items-center gap-2">
             {isCollapsed ? <ChevronRight size={20} className="text-gray-400" /> : <ChevronDown size={20} className="text-gray-400" />}
             <h2 className="text-xl font-bold text-white">{title}</h2>
+            {type === 'synth' && smartPadEnabled && (
+                <div className="ml-4 px-3 py-1 bg-purple-900/50 border border-purple-500/30 rounded text-purple-300 font-mono text-sm font-bold animate-pulse">
+                    {currentChord || "--"}
+                </div>
+            )}
         </div>
         <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center bg-gray-900 rounded border border-gray-700">
@@ -103,7 +111,7 @@ const InstrumentSection = ({
                     className="text-xs text-gray-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-gray-600 file:text-white hover:file:bg-gray-500"
                 />
             </div>
-            <div className="text-xs text-gray-500 mb-4 font-mono" style={isCompact ? { marginBottom: '2.9rem' } : {}}>{name}</div>
+            <div className="text-xs text-gray-500 mb-4 font-mono" style={isCompact ? { marginBottom: '1.9rem' } : {}}>{name}</div>
 
             <label className="block text-xs text-gray-400 mb-1 mt-auto">Preset</label>
             <div className="flex items-center gap-2 mb-4">
@@ -151,6 +159,14 @@ const InstrumentSection = ({
                 >
                     No Sens
                 </button>
+                {type === 'synth' && (
+                    <button 
+                        onClick={() => setSmartPadEnabled(!smartPadEnabled)}
+                        className={`flex-1 py-2 text-xs font-bold rounded transition-colors ${smartPadEnabled ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
+                    >
+                        Smart Pad
+                    </button>
+                )}
             </div>
         </div>
 
