@@ -61,7 +61,7 @@ function SF2Workstation() {
 
       try {
         audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-        await audioContextRef.current.audioWorklet.addModule('/spessasynth_processor.min.js');
+        await audioContextRef.current.audioWorklet.addModule(`${import.meta.env.BASE_URL}spessasynth_processor.min.js`);
         await audioContextRef.current.resume();
         
         // Create Two Separate Synths
@@ -181,7 +181,7 @@ function SF2Workstation() {
 
         // Auto-load GeneralUser-GS.sf2
         try {
-            const response = await fetch('/GeneralUser-GS.sf2');
+            const response = await fetch(`${import.meta.env.BASE_URL}GeneralUser-GS.sf2`);
             if (response.ok) {
                 const buffer = await response.arrayBuffer();
                 const bufferCopy = buffer.slice(0); // Clone for the second synth

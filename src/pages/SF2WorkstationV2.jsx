@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { WorkletSynthesizer } from 'spessasynth_lib';
 import VirtualKeyboard from '../components/VirtualKeyboard';
 import InstrumentSection from '../components/InstrumentSection';
+import { Maximize, Minimize, ChevronDown, ChevronRight } from 'lucide-react';
 
 function SF2WorkstationV2() {
   // Audio State
@@ -79,13 +80,30 @@ function SF2WorkstationV2() {
 
   const [audioStarted, setAudioStarted] = useState(false);
 
+  // UI Toggles
+  const [showKeyboard, setShowKeyboard] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isSplitBassCollapsed, setIsSplitBassCollapsed] = useState(false);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    }
+  };
+
   // Initialize Audio
   const startAudio = async () => {
       if (audioContextRef.current) return;
 
       try {
         audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-        await audioContextRef.current.audioWorklet.addModule('/spessasynth_processor.min.js');
+        await audioContextRef.current.audioWorklet.addModule(`${import.meta.env.BASE_URL}spessasynth_processor.min.js`);
         await audioContextRef.current.resume();
         
         // Create Synths
@@ -209,7 +227,7 @@ function SF2WorkstationV2() {
 
         // Auto-load GeneralUser-GS.sf2
         try {
-            const response = await fetch('/GeneralUser-GS.sf2');
+            const response = await fetch(`${import.meta.env.BASE_URL}GeneralUser-GS.sf2`);
             if (response.ok) {
                 const buffer = await response.arrayBuffer();
                 const bufferCopy1 = buffer.slice(0); 
@@ -561,9 +579,27 @@ function SF2WorkstationV2() {
       ) : null}
 
       <div className="max-w-6xl mx-auto">
-        <header className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-white tracking-tight">SF2 Workstation <span className="text-red-500 text-sm align-top">V2</span></h1>
-            <p className="text-gray-500 text-sm">Tri-Layer Split Player</p>
+        <header className="mb-8 relative flex items-center justify-center">
+            <div className="text-center">
+                <h1 className="text-3xl font-bold text-white tracking-tight"><span className='text-red-500'>SF2</span> Workstation</h1>
+                <p className="text-gray-500 text-sm">Tri-Layer Split Player</p>
+            </div>
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 flex gap-2">
+                 <button 
+                    onClick={() => setShowKeyboard(!showKeyboard)}
+                    className={`p-2 rounded-lg transition-colors ${showKeyboard ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
+                    title={showKeyboard ? "Hide Keyboard" : "Show Keyboard"}
+                >
+                    <span className="text-xl leading-none">🎹</span>
+                </button>
+                <button 
+                    onClick={toggleFullscreen}
+                    className="p-2 bg-gray-700 text-gray-400 rounded-lg hover:bg-gray-600 transition-colors"
+                    title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                >
+                    {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+                </button>
+            </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -644,9 +680,16 @@ function SF2WorkstationV2() {
 
             {/* Right Column: Bass Split */}
             <div className="lg:col-span-1 flex flex-col h-full">
-                <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 h-full flex flex-col" style={{ marginBottom: '1rem', height: 'min-content' }}>
-                    <h2 className="text-xl font-bold text-white mb-4">Split Bass</h2>
+                <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col" style={{ marginBottom: '1rem', height: isSplitBassCollapsed ? 'auto' : 'min-content' }}>
+                    <div className="flex justify-between items-center mb-4 cursor-pointer" onClick={() => setIsSplitBassCollapsed(!isSplitBassCollapsed)}>
+                        <div className="flex items-center gap-2">
+                            {isSplitBassCollapsed ? <ChevronRight size={20} className="text-gray-400" /> : <ChevronDown size={20} className="text-gray-400" />}
+                            <h2 className="text-xl font-bold text-white">Split Bass</h2>
+                        </div>
+                    </div>
                     
+                    {!isSplitBassCollapsed && (
+                    <>
                     <div className="mb-4">
                         <label className="block text-xs text-gray-400 mb-1">Split Point (MIDI Note)</label>
                         <div className="flex items-center gap-2">
@@ -670,7 +713,9 @@ function SF2WorkstationV2() {
                             onChange={(e) => setBassVolume(parseInt(e.target.value))}
                             className="fader-slider w-full"
                         />
-                    </div>                    
+                    </div>
+                    </>
+                    )}
                 </div>
                 <InstrumentSection 
                         title="Bass Layer" 
@@ -698,9 +743,11 @@ function SF2WorkstationV2() {
             </div>
         </div>
 
-        <div className="mt-8">
-            <VirtualKeyboard onNoteOn={handleNoteOn} onNoteOff={handleNoteOff} />
-        </div>
+        {showKeyboard && (
+            <div className="mt-8">
+                <VirtualKeyboard onNoteOn={handleNoteOn} onNoteOff={handleNoteOff} />
+            </div>
+        )}
       </div>
     </div>
   );

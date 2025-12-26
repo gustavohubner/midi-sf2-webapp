@@ -1,5 +1,5 @@
-import React from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 
 const InstrumentSection = ({ 
     title, 
@@ -24,6 +24,8 @@ const InstrumentSection = ({
     showEffects = true,
     isCompact = false
 }) => {
+    const [isCollapsed, setIsCollapsed] = useState(false);
+
     const handlePrevPreset = () => {
         if (presets.length === 0) return;
         const newIndex = presetIndex - 1;
@@ -52,11 +54,13 @@ const InstrumentSection = ({
     };
 
     return (
-    // <div className="bg-gray-800 p-4 rounded-lg mb-4 border border-gray-700" style={isCompact ? { height: 'inherit' } : {}>
     <div className={`bg-gray-800 p-4 rounded-lg mb-4 border border-gray-700`} style={isCompact ? { height: 'inherit' } : {}}>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-white">{title}</h2>
-        <div className="flex items-center gap-4">
+      <div className="flex justify-between items-center mb-4 cursor-pointer" onClick={() => setIsCollapsed(!isCollapsed)}>
+        <div className="flex items-center gap-2">
+            {isCollapsed ? <ChevronRight size={20} className="text-gray-400" /> : <ChevronDown size={20} className="text-gray-400" />}
+            <h2 className="text-xl font-bold text-white">{title}</h2>
+        </div>
+        <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center bg-gray-900 rounded border border-gray-700">
                 <button 
                     onClick={() => setOctave(octave - 1)}
@@ -87,6 +91,7 @@ const InstrumentSection = ({
         </div>
       </div>
 
+      {!isCollapsed && (
       <div className={`grid gap-4 ${isCompact ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-3'}`} >
         <div className="flex flex-col h-full">
             <label className="block text-xs text-gray-400 mb-1">SoundFont File</label>
@@ -239,6 +244,7 @@ const InstrumentSection = ({
         </div>
         )}
       </div>
+      )}
     </div>
     );
 };

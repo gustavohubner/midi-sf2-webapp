@@ -5,10 +5,10 @@ import SF2WorkstationV2 from './pages/SF2WorkstationV2';
 
 function App() {
   return (
-    <Router>
+    <Router basename={import.meta.env.BASE_URL}>
       <Routes>
-        <Route path="/" element={<SF2Workstation />} />
-        <Route path="/v2" element={<SF2WorkstationV2 />} />
+        <Route path="/lite" element={<SF2Workstation />} />
+        <Route path="/" element={<SF2WorkstationV2 />} />
         <Route path="*" element={<SF2Workstation />} />
       </Routes>
     </Router>
