@@ -132,7 +132,9 @@ function SF2WorkstationV2() {
       if (audioContextRef.current) return;
 
       try {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+            latencyHint: 'interactive'
+        });
         await audioContextRef.current.audioWorklet.addModule(`${import.meta.env.BASE_URL}spessasynth_processor.min.js`);
         await audioContextRef.current.resume();
         
