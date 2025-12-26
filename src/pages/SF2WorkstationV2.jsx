@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { WorkletSynthesizer } from 'spessasynth_lib';
 import VirtualKeyboard from '../components/VirtualKeyboard';
 import InstrumentSection from '../components/InstrumentSection';
-import { Maximize, Minimize, ChevronDown, ChevronRight } from 'lucide-react';
+import { Maximize, Minimize, ChevronDown, ChevronRight, Settings, X } from 'lucide-react';
 
 function SF2WorkstationV2() {
   // Audio State
@@ -53,7 +53,7 @@ function SF2WorkstationV2() {
   const [synthOctave, setSynthOctave] = useState(0);
   const [bassOctave, setBassOctave] = useState(0);
   
-  const [bassSplitKey, setBassSplitKey] = useState(48); // C3
+  const [bassSplitKey, setBassSplitKey] = useState(60); // C4
 
   // EQ State
   const [eqValues, setEqValues] = useState({
@@ -84,6 +84,14 @@ function SF2WorkstationV2() {
   const [showKeyboard, setShowKeyboard] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isSplitBassCollapsed, setIsSplitBassCollapsed] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Settings State
+  const [longReleaseValue, setLongReleaseValue] = useState(110);
+  const [noSensVelocity, setNoSensVelocity] = useState(96);
+  const [pianoPolyphony, setPianoPolyphony] = useState(16);
+  const [synthPolyphony, setSynthPolyphony] = useState(16);
+  const [bassPolyphony, setBassPolyphony] = useState(2);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -449,7 +457,7 @@ function SF2WorkstationV2() {
     // Check Split
     if (bassEnabled && note < bassSplitKey) {
         if (bassSynth) {
-            const vel = bassNoSens ? 127 : velocity;
+            const vel = bassNoSens ? noSensVelocity : velocity;
             const n = note + (bassOctave * 12);
             if (n >= 0 && n <= 127) bassSynth.noteOn(0, n, vel);
         }
@@ -457,12 +465,12 @@ function SF2WorkstationV2() {
     }
 
     if (pianoSynth && pianoEnabled) {
-        const vel = pianoNoSens ? 127 : velocity;
+        const vel = pianoNoSens ? noSensVelocity : velocity;
         const n = note + (pianoOctave * 12);
         if (n >= 0 && n <= 127) pianoSynth.noteOn(0, n, vel);
     }
     if (synthSynth && synthEnabled) {
-        const vel = synthNoSens ? 127 : velocity;
+        const vel = synthNoSens ? noSensVelocity : velocity;
         const n = note + (synthOctave * 12);
         if (n >= 0 && n <= 127) synthSynth.noteOn(0, n, vel);
     }
@@ -540,16 +548,29 @@ function SF2WorkstationV2() {
 
   // Handle Long Release Toggle
   useEffect(() => {
-      if (pianoSynth) pianoSynth.controllerChange(0, 72, pianoLongRelease ? 110 : 64);
-  }, [pianoLongRelease, pianoSynth]);
+      if (pianoSynth) pianoSynth.controllerChange(0, 72, pianoLongRelease ? longReleaseValue : 64);
+  }, [pianoLongRelease, pianoSynth, longReleaseValue]);
 
   useEffect(() => {
-      if (synthSynth) synthSynth.controllerChange(0, 72, synthLongRelease ? 110 : 64);
-  }, [synthLongRelease, synthSynth]);
+      if (synthSynth) synthSynth.controllerChange(0, 72, synthLongRelease ? longReleaseValue : 64);
+  }, [synthLongRelease, synthSynth, longReleaseValue]);
 
   useEffect(() => {
-      if (bassSynth) bassSynth.controllerChange(0, 72, bassLongRelease ? 110 : 64);
-  }, [bassLongRelease, bassSynth]);
+      if (bassSynth) bassSynth.controllerChange(0, 72, bassLongRelease ? longReleaseValue : 64);
+  }, [bassLongRelease, bassSynth, longReleaseValue]);
+
+  // Handle Polyphony Changes
+  useEffect(() => {
+      if (pianoSynth) pianoSynth.setMasterParameter("voiceCap", pianoPolyphony);
+  }, [pianoPolyphony, pianoSynth]);
+
+  useEffect(() => {
+      if (synthSynth) synthSynth.setMasterParameter("voiceCap", synthPolyphony);
+  }, [synthPolyphony, synthSynth]);
+
+  useEffect(() => {
+      if (bassSynth) bassSynth.setMasterParameter("voiceCap", bassPolyphony);
+  }, [bassPolyphony, bassSynth]);
 
     // Helper for "Sticky 50" slider
     const fromSliderValue = (val) => {
@@ -599,8 +620,115 @@ function SF2WorkstationV2() {
                 >
                     {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
                 </button>
+                <button 
+                    onClick={() => setShowSettings(!showSettings)}
+                    className={`p-2 rounded-lg transition-colors ${showSettings ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
+                    title="Settings"
+                >
+                    <Settings size={20} />
+                </button>
             </div>
         </header>
+
+        {showSettings && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
+                    <button 
+                        onClick={() => setShowSettings(false)}
+                        className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+                    >
+                        <X size={24} />
+                    </button>
+
+                    <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                        <Settings size={24} /> Settings
+                    </h2>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-300 mb-3">Long Release Time</h3>
+                            <div className="flex items-center gap-4">
+                                <input 
+                                    type="range" 
+                                    min="64" 
+                                    max="127" 
+                                    value={longReleaseValue} 
+                                    onChange={(e) => setLongReleaseValue(parseInt(e.target.value))}
+                                    className="fader-slider flex-1"
+                                />
+                                <span className="text-white font-mono w-12 text-right">{longReleaseValue}</span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">Controls the CC 72 value sent when Long Release is enabled (Default: 110).</p>
+                        
+                            <h3 className="text-lg font-semibold text-gray-300 mb-3 mt-6">No Sens Velocity</h3>
+                            <div className="flex items-center gap-4">
+                                <input 
+                                    type="range" 
+                                    min="1" 
+                                    max="127" 
+                                    value={noSensVelocity} 
+                                    onChange={(e) => setNoSensVelocity(parseInt(e.target.value))}
+                                    className="fader-slider flex-1"
+                                />
+                                <span className="text-white font-mono w-12 text-right">{noSensVelocity}</span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">Fixed velocity when "No Sens" is enabled (Default: 127).</p>
+                        </div>
+
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-300 mb-3">Max Polyphony</h3>
+                            
+                            <div className="space-y-4">
+                                <div>
+                                    <div className="flex justify-between text-sm text-gray-400 mb-1">
+                                        <span>Piano</span>
+                                        <span>{pianoPolyphony} voices</span>
+                                    </div>
+                                    <input 
+                                        type="range" 
+                                        min="1" 
+                                        max="200" 
+                                        value={pianoPolyphony} 
+                                        onChange={(e) => setPianoPolyphony(parseInt(e.target.value))}
+                                        className="fader-slider w-full"
+                                    />
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between text-sm text-gray-400 mb-1">
+                                        <span>Synth</span>
+                                        <span>{synthPolyphony} voices</span>
+                                    </div>
+                                    <input 
+                                        type="range" 
+                                        min="1" 
+                                        max="200" 
+                                        value={synthPolyphony} 
+                                        onChange={(e) => setSynthPolyphony(parseInt(e.target.value))}
+                                        className="fader-slider w-full"
+                                    />
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between text-sm text-gray-400 mb-1">
+                                        <span>Bass</span>
+                                        <span>{bassPolyphony} voices</span>
+                                    </div>
+                                    <input 
+                                        type="range" 
+                                        min="1" 
+                                        max="200" 
+                                        value={bassPolyphony} 
+                                        onChange={(e) => setBassPolyphony(parseInt(e.target.value))}
+                                        className="fader-slider w-full"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column: Piano & Synth */}
@@ -699,7 +827,7 @@ function SF2WorkstationV2() {
                                 onChange={(e) => setBassSplitKey(parseInt(e.target.value))}
                                 className="bg-gray-900 text-white text-sm p-2 rounded border border-gray-700 w-20"
                             />
-                            <span className="text-xs text-gray-500">Default: 48 (C3)</span>
+                            <span className="text-xs text-gray-500">Default: 60 (C4)</span>
                         </div>
                     </div>
 

@@ -2,6 +2,8 @@
 
 **SF2 Workstation** is a professional web-based SoundFont player and audio workstation built with React and the Web Audio API. It allows users to load SoundFont (.sf2) files, layer instruments, apply real-time effects, and play using either an on-screen virtual keyboard or a physical MIDI controller.
 
+You can test it here: https://gustavohubner.github.io/midi-sf2-webapp/
+
 ![SF2 Workstation](public/screenshot.png)
 
 ## Features
