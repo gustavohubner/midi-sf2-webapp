@@ -562,7 +562,7 @@ function UltimateStagePianosV2() {
 
       <div className="max-w-6xl mx-auto">
         <header className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-white tracking-tight">Ultimate Stage Pianos <span className="text-red-500 text-sm align-top">V2</span></h1>
+            <h1 className="text-3xl font-bold text-white tracking-tight">SF2 Workstation <span className="text-red-500 text-sm align-top">V2</span></h1>
             <p className="text-gray-500 text-sm">Tri-Layer Split Player</p>
         </header>
 

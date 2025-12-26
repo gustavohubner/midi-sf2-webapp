@@ -3,7 +3,7 @@ import { WorkletSynthesizer } from 'spessasynth_lib';
 import VirtualKeyboard from '../components/VirtualKeyboard';
 import InstrumentSection from '../components/InstrumentSection';
 
-function UltimateStagePianos() {
+function SF2Workstation() {
   // Audio State
   const [pianoSynth, setPianoSynth] = useState(null);
   const [synthSynth, setSynthSynth] = useState(null);
@@ -586,4 +586,4 @@ function UltimateStagePianos() {
   );
 }
 
-export default UltimateStagePianos;
+export default SF2Workstation;
