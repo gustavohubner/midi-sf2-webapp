@@ -1,100 +1,87 @@
 # SF2 Workstation
 
-**SF2 Workstation** is a professional web-based SoundFont player and audio workstation built with React and the Web Audio API. It allows users to load SoundFont (.sf2) files, layer instruments, apply real-time effects, and play using either an on-screen virtual keyboard or a physical MIDI controller.
+**SF2 Workstation** is a high-performance, web-based audio synthesis environment engineered with React and the Web Audio API. It leverages `spessasynth_lib` and AudioWorklets to provide low-latency SoundFont (.sf2) playback, real-time digital signal processing (DSP), and intelligent harmonic analysis.
 
-You can test it here: https://gustavohubner.github.io/midi-sf2-webapp/
+Live Demo: https://gustavohubner.github.io/midi-sf2-webapp/
 
 ![SF2 Workstation](public/screenshot.png)
 
-## Features
+## System Architecture
 
-### 🎹 Audio Engine
-- **High-Performance Synthesis**: Powered by `spessasynth_lib` and AudioWorklets for low-latency audio.
-- **SoundFont Support**: Fully compatible with `.sf2` files. Comes with `GeneralUser-GS.sf2` pre-configured.
-- **Polyphony**: Supports complex chords and sustained notes without dropouts.
+The application is built upon a modular tri-layer synthesis engine, designed to emulate professional hardware workstations.
 
-### 🎛️ Real-Time Processing
-- **3-Band Equalizer**: Dedicated Treble, Mid, and Bass controls for each instrument layer.
-- **DJ-Style Filter**: Single-knob Low Pass / High Pass filter (LPF/HPF) for creative sweeps.
-- **Effects Rack**:
-  - **Reverb**: Add space and depth.
-  - **Chorus**: Thicken the sound.
-  - **Delay**: Echo effects with adjustable Mix, Time, and Feedback.
+### 🎹 Core Audio Engine
+- **Synthesis Kernel**: Utilizes `spessasynth_lib` for SoundFont rendering, supporting standard `.sf2` specifications.
+- **AudioWorklet Implementation**: Audio processing occurs on a dedicated thread to ensure timing accuracy and prevent UI blocking.
+- **Dynamic Polyphony Management**: Configurable voice allocation per layer to optimize CPU usage.
 
-### 🎚️ Professional UI
-- **Dual & Tri-Layer Modes**:
-  - **Standard Mode**: Mix Piano and Synth layers.
-  - **V2 Mode**: Adds a dedicated **Split Bass** layer for left-hand accompaniment.
-- **Smart Sliders**: "Sticky Center" faders that snap to 50% for easy resetting.
-- **Master Control**: Global volume and mix controls.
+### 🧠 Smart Harmony Engine (New)
+A proprietary logic module for real-time music theory analysis:
+- **Interval Analysis**: Detects chords based on incoming MIDI note intervals relative to the root.
+- **Smart Pad Accompaniment**: Automatically generates and voices synth pads based on the detected harmonic context.
+- **Configurable Detection**: Adjustable history buffer size and allowed chord qualities (Major, Minor, Diminished, Augmented, etc.).
+- **Latch Mode**: Infinite sustain capability for chord holds, enabling complex performance layering.
 
-### 🔌 MIDI Integration
-- **Plug & Play**: Automatically detects connected MIDI keyboards and controllers.
-- **Full Control**: Supports Note On/Off, Velocity, and Sustain Pedal (CC 64).
-- **Velocity Sensitivity**: Toggle "No Sens" to force max velocity for synth/organ styles.
+### 🎛️ Signal Processing Chain
+Each instrument layer (Piano, Synth, Bass) possesses an independent signal path:
+- **3-Band Parametric EQ**: Biquad filters for precise tonal shaping (LowShelf, Peaking, HighShelf).
+- **State-Variable Filter**: Single-control DJ-style filter sweeping between Low Pass (LPF) and High Pass (HPF).
+- **Effects Bus**:
+  - **Reverb & Chorus**: MIDI CC-controlled spatial effects.
+  - **Delay Line**: Feedback delay with adjustable time and mix parameters.
 
-## Versions
+## Feature Set
 
-The application includes two distinct workstation layouts:
+### Tri-Layer Split Architecture
+- **Layer 1 (Piano)**: Primary melodic voice.
+- **Layer 2 (Synth)**: Atmospheric layer with optional Smart Pad integration.
+- **Layer 3 (Bass)**: Monophonic/Polyphonic bass section with configurable MIDI split point.
 
-### 1. Standard Workstation (`/`)
-- **Dual Layer**: Piano + Synth.
-- **Mix Fader**: Seamlessly blend between the two layers.
-- **Ideal for**: Layering pads behind pianos, strings, or brass.
+### Advanced Configuration
+- **Global Settings Modal**: Centralized control for system parameters.
+- **Velocity Curves**: Toggleable "No Sens" mode for fixed-velocity performance (Organ/Synth styles).
+- **Long Release**: CC 72 override for extended envelope release times.
 
-### 2. Workstation V2 (`/v2`)
-- **Tri-Layer Split**: Piano + Synth + **Bass**.
-- **Split Point**: Configurable MIDI split point (Default: C3). Notes below this play the Bass layer.
-- **Dedicated Bass Section**: Independent volume, EQ, and filter for the bass.
-- **Ideal for**: Live performance, playing bass lines with the left hand and chords/melody with the right.
+## Versioning
 
-## Getting Started
+### v2.0.0 (Current Release)
+The primary interface for the application.
+- **Path**: `/`
+- **Status**: Active Development
+- **Key Features**: Tri-Layer Split, Smart Harmony Engine, Advanced Settings, Visual Chord Display.
 
-### Prerequisites
-- Node.js (v16 or higher)
-- npm or yarn
+### v1.0.0 (Legacy)
+The original dual-layer prototype.
+- **Status**: **Deprecated**
+- **Note**: This version is no longer maintained and lacks the Bass layer and Smart Harmony features.
 
-### Installation
+## Technical Stack
 
-1. Clone the repository:
+- **Frontend**: React 18
+- **Build System**: Vite
+- **Styling**: Tailwind CSS
+- **Audio Core**: Web Audio API (AudioContext, AudioWorklet)
+- **MIDI**: Web MIDI API
+- **Synthesis Library**: spessasynth_lib
+
+## Installation & Development
+
+1. **Clone Repository**
    ```bash
    git clone https://github.com/yourusername/sf2-workstation.git
    cd sf2-workstation
    ```
 
-2. Install dependencies:
+2. **Install Dependencies**
    ```bash
    npm install
    ```
 
-3. Run the development server:
+3. **Start Development Server**
    ```bash
    npm run dev
    ```
 
-4. Open your browser at `http://localhost:5173`.
-
-## Usage Guide
-
-1. **Start Engine**: Click the "CLICK TO START ENGINE" button to initialize the audio context.
-2. **Load Sounds**:
-   - The app auto-loads `GeneralUser-GS.sf2` if available in the `public` folder.
-   - Use the "Choose File" button to load your own `.sf2` files.
-3. **Select Presets**: Use the dropdown or `< >` arrows to change instruments.
-4. **Shape Sound**:
-   - Adjust **EQ** sliders to shape the tone.
-   - Use the **Filter** slider: Left for Low Pass (muffled), Right for High Pass (thin), Center for clean.
-   - Enable **Long Release** for ambient pads.
-5. **Play**: Use your mouse on the virtual keyboard or connect a USB MIDI keyboard.
-
-## Technologies Used
-
-- **React**: UI Framework.
-- **Vite**: Build tool.
-- **Tailwind CSS**: Styling.
-- **Web Audio API**: Core audio processing.
-- **spessasynth_lib**: SoundFont synthesizer library.
-
 ## License
 
-This project is open source.
+This project is open source and available under the MIT License.
